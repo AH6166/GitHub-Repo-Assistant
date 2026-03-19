@@ -81,10 +81,21 @@ if input_method == "GitHub URL":
                     contents = repo_obj.get_contents("")
                     files = []
                     
+                    import base64
+
                     def get_files(contents):
                         for content in contents:
                             if content.type == "file":
-                                files.append((content.path, content.decoded_content.decode('utf-8', errors='ignore')))
+                                try:
+                                    # Use raw base64 content (avoid PyGitHub decoding issues)
+                                    raw = content.content
+                                    if raw:
+                                        decoded = base64.b64decode(raw)
+                                        text = decoded.decode('utf-8', errors='ignore')
+                                        files.append((content.path, text))
+                                except Exception:
+                                    # Skip files that cannot be decoded as UTF-8
+                                    continue
                             elif content.type == "dir":
                                 get_files(repo_obj.get_contents(content.path))
                     
