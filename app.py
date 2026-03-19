@@ -19,6 +19,13 @@ load_dotenv()
 if "OPENAI_API_KEY" not in st.session_state:
     st.session_state.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
+# Persist repo state across reruns
+if "repo_content" not in st.session_state:
+    st.session_state.repo_content = None
+if "repo_name" not in st.session_state:
+    st.session_state.repo_name = None
+
+
 def get_openai_api_key() -> str:
     return st.session_state.OPENAI_API_KEY
 
@@ -49,8 +56,9 @@ if not openai_key:
 # Input method
 input_method = st.radio("How to provide the repository?", ("GitHub URL", "Upload ZIP"))
 
-repo_content = None
-repo_name = None
+# Use session state to keep the loaded repo across reruns
+repo_content = st.session_state.repo_content
+repo_name = st.session_state.repo_name
 
 if input_method == "GitHub URL":
     github_url = st.text_input("Enter GitHub repository URL (e.g., https://github.com/user/repo)")
@@ -82,7 +90,8 @@ if input_method == "GitHub URL":
                     
                     get_files(contents)
                     
-                    repo_content = files
+                    st.session_state.repo_content = files
+                    st.session_state.repo_name = repo_name
                     st.success(f"Loaded {len(files)} files from {repo_name}")
                 else:
                     st.error("Invalid GitHub URL")
@@ -125,7 +134,8 @@ elif input_method == "Upload ZIP":
                             except:
                                 pass  # Skip binary files
                     
-                    repo_content = files
+                    st.session_state.repo_content = files
+                    st.session_state.repo_name = repo_name
                     st.success(f"Processed {len(files)} files from {repo_name}")
                 else:
                     st.error("Could not find repository directory in ZIP")
@@ -133,7 +143,7 @@ elif input_method == "Upload ZIP":
             st.error(f"Error processing ZIP: {str(e)}")
 
 # If repo loaded, process and store
-if repo_content and repo_name:
+if st.session_state.repo_content and st.session_state.repo_name:
     if not openai_key:
         st.error("OpenAI API key is required to index the repository. Please set OPENAI_API_KEY in .env or enter it above.")
     else:
@@ -151,7 +161,7 @@ if repo_content and repo_name:
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 documents = []
                 
-                for file_path, content in repo_content:
+                for file_path, content in st.session_state.repo_content:
                     if content.strip():  # Skip empty files
                         chunks = text_splitter.split_text(content)
                         for i, chunk in enumerate(chunks):
