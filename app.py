@@ -6,26 +6,45 @@ from github import Github
 from sentence_transformers import SentenceTransformer
 import chromadb
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.vectorstores import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains import RetrievalQA
-from langchain.docstore.document import Document
+from langchain_community.vectorstores import Chroma
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_classic.chains.retrieval_qa.base import RetrievalQA
+from langchain_core.documents import Document
 import openai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Set OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Manage OpenAI API key
+if "OPENAI_API_KEY" not in st.session_state:
+    st.session_state.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-# Initialize models
+def get_openai_api_key() -> str:
+    return st.session_state.OPENAI_API_KEY
+
+openai_key = get_openai_api_key()
+if openai_key:
+    openai.api_key = openai_key
+
+# Embedding model (no API key needed)
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
-# Chroma client
+# Chroma client (persistent vector DB)
 client = chromadb.PersistentClient(path="./chroma_db")
 
 st.title("GitHub Repo Knowledge Assistant")
+
+# OpenAI API key input
+if not openai_key:
+    key_input = st.text_input(
+        "OpenAI API key (required for embeddings & Q&A)",
+        type="password",
+        help="Set OPENAI_API_KEY in a .env file or paste your key here.",
+    )
+    if key_input:
+        st.session_state.OPENAI_API_KEY = key_input
+        openai_key = key_input
+        openai.api_key = key_input
 
 # Input method
 input_method = st.radio("How to provide the repository?", ("GitHub URL", "Upload ZIP"))
@@ -115,34 +134,37 @@ elif input_method == "Upload ZIP":
 
 # If repo loaded, process and store
 if repo_content and repo_name:
-    if st.button("Process and Index Repository"):
-        with st.spinner("Processing repository..."):
-            # Create collection
-            collection_name = repo_name.replace('/', '_')
-            try:
-                client.delete_collection(collection_name)
-            except:
-                pass
-            collection = client.create_collection(name=collection_name)
-            
-            # Chunk and embed
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            documents = []
-            
-            for file_path, content in repo_content:
-                if content.strip():  # Skip empty files
-                    chunks = text_splitter.split_text(content)
-                    for i, chunk in enumerate(chunks):
-                        doc_id = f"{file_path}_{i}"
-                        documents.append(Document(page_content=chunk, metadata={"source": file_path}))
-            
-            # Create vector store
-            embeddings = OpenAIEmbeddings()
-            vectorstore = Chroma.from_documents(documents, embeddings, collection_name=collection_name)
-            
-            st.session_state.vectorstore = vectorstore
-            st.session_state.repo_name = repo_name
-            st.success("Repository indexed successfully!")
+    if not openai_key:
+        st.error("OpenAI API key is required to index the repository. Please set OPENAI_API_KEY in .env or enter it above.")
+    else:
+        if st.button("Process and Index Repository"):
+            with st.spinner("Processing repository..."):
+                # Create collection
+                collection_name = repo_name.replace('/', '_')
+                try:
+                    client.delete_collection(collection_name)
+                except:
+                    pass
+                collection = client.create_collection(name=collection_name)
+                
+                # Chunk and embed
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                documents = []
+                
+                for file_path, content in repo_content:
+                    if content.strip():  # Skip empty files
+                        chunks = text_splitter.split_text(content)
+                        for i, chunk in enumerate(chunks):
+                            doc_id = f"{file_path}_{i}"
+                            documents.append(Document(page_content=chunk, metadata={"source": file_path}))
+                
+                # Create vector store
+                embeddings = OpenAIEmbeddings(openai_api_key=openai_key)
+                vectorstore = Chroma.from_documents(documents, embeddings, collection_name=collection_name)
+                
+                st.session_state.vectorstore = vectorstore
+                st.session_state.repo_name = repo_name
+                st.success("Repository indexed successfully!")
 
 # Question answering
 if 'vectorstore' in st.session_state:
