@@ -1,6 +1,17 @@
 # GitHub-Repo-Assistant
 Answer natural-language questions over codebases
 
+## Tech Stack
+- **Frontend**: Streamlit (Python web framework)
+- **Backend**: Python 3.8+
+- **Embeddings**: OpenAI Embeddings API
+- **Vector Store**: ChromaDB
+- **LLM**: OpenAI GPT-3.5-turbo
+- **Libraries**: LangChain, PyGitHub, Sentence Transformers
+
+## Architecture
+The system ingests codebases from GitHub repositories or ZIP file uploads. Code files are chunked into 1000-character segments with 200-character overlap for optimal processing. OpenAI embeddings capture semantic meaning of each chunk. Embeddings are stored in ChromaDB vector database for efficient similarity search. User questions trigger semantic retrieval of relevant code snippets. Finally, GPT-3.5-turbo generates contextual answers using retrieved information and the original query.
+
 ## Setup
 
 1. Clone or download this repository.
@@ -27,6 +38,14 @@ Answer natural-language questions over codebases
    ```
    streamlit run app.py
    ```
+
+## Project Structure
+- `app.py`: Main Streamlit application containing the web interface, repository loading logic, embedding generation, and question-answering pipeline
+- `requirements.txt`: Python dependencies including Streamlit, LangChain, OpenAI, ChromaDB, and PyGitHub
+- `.env.example`: Template file showing required environment variables (copy to `.env` and add your API keys)
+- `.gitignore`: Specifies files and directories to exclude from Git (virtual environments, API keys, vector database)
+- `README.md`: This documentation file
+- `chroma_db/`: Directory created at runtime to store vector embeddings and indexed repository data
 
 ## Usage
 
