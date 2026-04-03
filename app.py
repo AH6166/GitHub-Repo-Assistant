@@ -160,15 +160,8 @@ if st.session_state.repo_content and st.session_state.repo_name:
     else:
         if st.button("Process and Index Repository"):
             with st.spinner("Processing repository..."):
-                # Create collection
-                collection_name = repo_name.replace('/', '_')
-                try:
-                    client.delete_collection(collection_name)
-                except:
-                    pass
-                collection = client.create_collection(name=collection_name)
-                
                 # Chunk and embed
+                collection_name = repo_name.replace('/', '_')
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 documents = []
                 
@@ -195,6 +188,7 @@ if 'vectorstore' in st.session_state:
     if st.button("Ask"):
         if question:
             with st.spinner("Thinking..."):
+                llm = ChatOpenAI(openai_api_key=openai_key, model="gpt-3.5-turbo")
                 qa_chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=st.session_state.vectorstore.as_retriever())
                 answer = qa_chain.run(question)
                 st.write("**Answer:**", answer)
